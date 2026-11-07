@@ -33,8 +33,15 @@ xcodebuild -project Henge.xcodeproj -scheme Henge -configuration Release -sdk ip
 grep -E "BUILD" "$DD.buildlog" || true
 APP="$DD/Build/Products/Release-iphoneos/Henge.app"
 rc=0
-for f in "$APP/Henge" "$APP/henge-jit.js" "$APP/PlugIns/HengeJITHelper.appex/HengeJITHelper" \
-         "$APP/Frameworks/StikJIT.framework/StikJIT" "$APP/Frameworks/StikJIT.framework/Info.plist"; do
+REQUIRED=("$APP/Henge" "$APP/henge-jit.js")
+# The built-in JIT helper (iOS 26) and StikJIT (17.4) are unusable on iOS 16,
+# and their higher minimum OS can stop iOS 16 from launching the bundle.
+if [ "$KEEP_DYNAMIC_CODESIGNING" != true ]; then
+    REQUIRED+=("$APP/PlugIns/HengeJITHelper.appex/HengeJITHelper"
+               "$APP/Frameworks/StikJIT.framework/StikJIT"
+               "$APP/Frameworks/StikJIT.framework/Info.plist")
+fi
+for f in "${REQUIRED[@]}"; do
     if [ -f "$f" ]; then printf "  ok       %s\n" "${f#$APP/}"; else echo "  MISSING  ${f#$APP/}" >&2; rc=1; fi
 done
 [ $rc -eq 0 ] || { echo "==> bundle is not installable; refusing to package" >&2; exit 1; }
@@ -53,6 +60,14 @@ if [ "$TROLLSTORE" = true ]; then
   done
 fi
 SAPP="$STAGE/Payload/Henge.app"
+# iOS 16 has no use for the built-in JIT helper, and both it (26.0) and StikJIT
+# (17.4) declare a newer minimum OS than the app: leaving them in can make the
+# system refuse to launch the bundle at all.
+if [ "$KEEP_DYNAMIC_CODESIGNING" = true ]; then
+  rm -rf "$SAPP/PlugIns/HengeJITHelper.appex" "$SAPP/Frameworks/StikJIT.framework"
+  rmdir "$SAPP/PlugIns" 2>/dev/null || true
+  rmdir "$SAPP/Frameworks" 2>/dev/null || true
+fi
 # Apple's boot ROM is fetched on the device (BootROM.swift) and must never ship. An older build folder can still
 # hold a copy from when the app bundled it, so it goes, and nothing is packaged if any is left.
 rm -f "$SAPP/AVPBooter.vmapple2.bin"
