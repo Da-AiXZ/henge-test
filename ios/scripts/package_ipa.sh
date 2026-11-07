@@ -22,6 +22,7 @@ OUT="$HOME/Desktop/Henge.ipa"
 cd "$IOS"
 xcodegen generate >/dev/null
 DD="$IOS/build/DerivedData"
+mkdir -p "$DD"
 xcodebuild -project Henge.xcodeproj -scheme Henge -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
     -derivedDataPath "$DD" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build > "$DD.buildlog" 2>&1 || {
     # Never package what an older build left behind.
