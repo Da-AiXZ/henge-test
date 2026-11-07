@@ -54,11 +54,18 @@ cp -R "$APP" "$STAGE/Payload/"
 ENT="$STAGE/entitlements.plist"
 cp "$IOS/Henge/Henge.entitlements" "$ENT"
 # Diagnostics: drop restricted entitlements that a given install cannot hold.
-# PlistBuddy is used because plutil treats dots as key-path separators.
+# Python, because plutil/PlistBuddy key paths treat dots specially.
 if [ -n "$ENT_STRIP" ]; then
-  for k in ${=ENT_STRIP}; do
-    /usr/libexec/PlistBuddy -c "Delete :$k" "$ENT" >/dev/null 2>&1 || true
-  done
+  python3 - "$ENT" "$ENT_STRIP" <<'PY'
+import plistlib, sys
+path, keys = sys.argv[1], sys.argv[2].split()
+with open(path, "rb") as f:
+    data = plistlib.load(f)
+for key in keys:
+    data.pop(key, None)
+with open(path, "wb") as f:
+    plistlib.dump(data, f)
+PY
 fi
 BANNED_KEYS=("com.apple.private.cs.debugger" "dynamic-codesigning" "com.apple.private.skip-library-validation")
 if [ "$TROLLSTORE" = true ]; then

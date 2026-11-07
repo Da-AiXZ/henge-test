@@ -57,46 +57,34 @@ jobs:
           make ios-lib
           ./tools/build_ios_restore.sh
 
-      # --trollstore-ios16 keeps dynamic-codesigning, which TrollStore needs for
-      # JIT on iOS 16 (the TXM-era --trollstore strips it).
-      - name: Package the tipa
+      # One tipa per entitlement combination. The bare build already launches
+      # on iPadOS 16.6.1, so this isolates which single entitlement iOS kills.
+      # --trollstore-ios16 keeps dynamic-codesigning unless ENT_STRIP removes it.
+      - name: Package entitlement variants
         env:
           HUSK: ${{ runner.temp }}/Husk
           IOS_DEPS: ${{ runner.temp }}/Husk/build/ios-arm64/sysroot
         run: |
           set -euo pipefail
           mkdir -p "$HOME/Desktop"
-          ios/scripts/package_ipa.sh --trollstore-ios16
-
-      # A second package with only get-task-allow + dynamic-codesigning. If the
-      # normal one is killed before main by a restricted entitlement, this one
-      # is the one that launches.
-      - name: Package the minimal-entitlement variant
-        env:
-          HUSK: ${{ runner.temp }}/Husk
-          IOS_DEPS: ${{ runner.temp }}/Husk/build/ios-arm64/sysroot
-          HENGE_OUT: /Users/runner/Desktop/Henge-iOS16-min.tipa
-          ENT_STRIP: "com.apple.developer.kernel.extended-virtual-addressing com.apple.developer.kernel.increased-memory-limit"
-        run: ios/scripts/package_ipa.sh --trollstore-ios16
-
-      # No custom entitlements at all: a launch-only test. JIT will not work here,
-      # but if this one opens, the crash is an entitlement being rejected.
-      - name: Package the no-entitlement variant
-        env:
-          HUSK: ${{ runner.temp }}/Husk
-          IOS_DEPS: ${{ runner.temp }}/Husk/build/ios-arm64/sysroot
-          HENGE_OUT: /Users/runner/Desktop/Henge-iOS16-bare.tipa
-          ENT_STRIP: "com.apple.developer.kernel.extended-virtual-addressing com.apple.developer.kernel.increased-memory-limit dynamic-codesigning get-task-allow"
-        run: ios/scripts/package_ipa.sh --trollstore-ios16
+          EVA="com.apple.developer.kernel.extended-virtual-addressing"
+          MEM="com.apple.developer.kernel.increased-memory-limit"
+          pkg() {
+            HENGE_OUT="$HOME/Desktop/$1" ENT_STRIP="$2" \
+              ios/scripts/package_ipa.sh --trollstore-ios16
+          }
+          pkg Henge-iOS16.tipa ""
+          pkg Henge-iOS16-bare.tipa "get-task-allow dynamic-codesigning $MEM $EVA"
+          pkg Henge-iOS16-gta.tipa "dynamic-codesigning $MEM $EVA"
+          pkg Henge-iOS16-dcs.tipa "get-task-allow $MEM $EVA"
+          pkg Henge-iOS16-mem.tipa "get-task-allow dynamic-codesigning $EVA"
+          pkg Henge-iOS16-eva.tipa "get-task-allow dynamic-codesigning $MEM"
 
       - name: Upload the tipas
         uses: actions/upload-artifact@v4
         with:
           name: Henge-iOS16-tipas
-          path: |
-            /Users/runner/Desktop/Henge-iOS16.tipa
-            /Users/runner/Desktop/Henge-iOS16-min.tipa
-            /Users/runner/Desktop/Henge-iOS16-bare.tipa
+          path: /Users/runner/Desktop/*.tipa
           if-no-files-found: error
 
       - name: Upload logs on failure
