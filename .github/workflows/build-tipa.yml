@@ -1,0 +1,86 @@
+name: Build TrollStore tipa
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # The app uses iOS 27 SDK types (guarded by #available), so it needs Xcode 27.
+    # GitHub's public preview image is labelled xcode-27 (arm64).
+    runs-on: xcode-27
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          rustc --version
+          swift --version
+
+      - name: Install build tools
+        run: brew install xcodegen meson pkg-config
+
+      # Henge links Husk's prebuilt iOS pieces: StikJIT.framework, libhusk_rppairing,
+      # libslirp, glib, intl and pcre2. Build just those, not Husk's QEMU.
+      - name: Build Husk dependencies
+        env:
+          SDKMINVER: "16.0"
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/Leviidev/Husk.git "$RUNNER_TEMP/Husk"
+          cd "$RUNNER_TEMP/Husk"
+          ./scripts/fetch_sources.sh
+          ./scripts/build_ios.sh libffi glib libslirp
+          rustup target add aarch64-apple-ios
+          ./scripts/build_rppairing_ios.sh
+
+      - name: Fetch Henge dependencies
+        env:
+          HUSK: ${{ runner.temp }}/Husk
+        run: ios/scripts/fetch_deps.sh
+
+      - name: Build engine and restore stack
+        env:
+          HUSK: ${{ runner.temp }}/Husk
+          IOS_DEPS: ${{ runner.temp }}/Husk/build/ios-arm64/sysroot
+        run: |
+          set -euo pipefail
+          make ios-lib
+          ./tools/build_ios_restore.sh
+
+      # --trollstore-ios16 keeps dynamic-codesigning, which TrollStore needs for
+      # JIT on iOS 16 (the TXM-era --trollstore strips it).
+      - name: Package the tipa
+        env:
+          HUSK: ${{ runner.temp }}/Husk
+          IOS_DEPS: ${{ runner.temp }}/Husk/build/ios-arm64/sysroot
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/Desktop"
+          ios/scripts/package_ipa.sh --trollstore-ios16
+
+      - name: Upload the tipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: Henge-iOS16-tipa
+          path: /Users/runner/Desktop/Henge-iOS16.tipa
+          if-no-files-found: error
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ios/build/DerivedData.buildlog
+            ${{ runner.temp }}/Husk/build/logs
+          if-no-files-found: ignore
