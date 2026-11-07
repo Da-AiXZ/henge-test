@@ -54,14 +54,17 @@ cp -R "$APP" "$STAGE/Payload/"
 ENT="$STAGE/entitlements.plist"
 cp "$IOS/Henge/Henge.entitlements" "$ENT"
 # Diagnostics: drop restricted entitlements that a given install cannot hold.
+# PlistBuddy is used because plutil treats dots as key-path separators.
 if [ -n "$ENT_STRIP" ]; then
-  for k in ${=ENT_STRIP}; do plutil -remove "$k" "$ENT" 2>/dev/null || true; done
+  for k in ${=ENT_STRIP}; do
+    /usr/libexec/PlistBuddy -c "Delete :$k" "$ENT" >/dev/null 2>&1 || true
+  done
 fi
 BANNED_KEYS=("com.apple.private.cs.debugger" "dynamic-codesigning" "com.apple.private.skip-library-validation")
 if [ "$TROLLSTORE" = true ]; then
   for k in "${BANNED_KEYS[@]}"; do
     if [ "$KEEP_DYNAMIC_CODESIGNING" = true ] && [ "$k" = "dynamic-codesigning" ]; then continue; fi
-    plutil -remove "$k" "$ENT" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Delete :$k" "$ENT" >/dev/null 2>&1 || true
   done
 fi
 SAPP="$STAGE/Payload/Henge.app"

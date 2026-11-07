@@ -79,6 +79,16 @@ jobs:
           ENT_STRIP: "com.apple.developer.kernel.extended-virtual-addressing com.apple.developer.kernel.increased-memory-limit"
         run: ios/scripts/package_ipa.sh --trollstore-ios16
 
+      # No custom entitlements at all: a launch-only test. JIT will not work here,
+      # but if this one opens, the crash is an entitlement being rejected.
+      - name: Package the no-entitlement variant
+        env:
+          HUSK: ${{ runner.temp }}/Husk
+          IOS_DEPS: ${{ runner.temp }}/Husk/build/ios-arm64/sysroot
+          HENGE_OUT: /Users/runner/Desktop/Henge-iOS16-bare.tipa
+          ENT_STRIP: "com.apple.developer.kernel.extended-virtual-addressing com.apple.developer.kernel.increased-memory-limit dynamic-codesigning get-task-allow"
+        run: ios/scripts/package_ipa.sh --trollstore-ios16
+
       - name: Upload the tipas
         uses: actions/upload-artifact@v4
         with:
@@ -86,6 +96,7 @@ jobs:
           path: |
             /Users/runner/Desktop/Henge-iOS16.tipa
             /Users/runner/Desktop/Henge-iOS16-min.tipa
+            /Users/runner/Desktop/Henge-iOS16-bare.tipa
           if-no-files-found: error
 
       - name: Upload logs on failure
