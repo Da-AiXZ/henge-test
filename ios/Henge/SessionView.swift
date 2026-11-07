@@ -261,7 +261,7 @@ struct SessionView: View {
             if let text = texts.first { Sharing.paste(text) }
         }
         .labelStyle(.iconOnly)
-        .buttonBorderShape(.circle)
+        .buttonBorderShape(.capsule)
         .tint(Desk.raised)
     }
 
