@@ -76,8 +76,12 @@ if [ -n "$(find "$STAGE" -iname 'AVPBooter*' -o -iname 'AVPSEPBooter*')" ]; then
   exit 1
 fi
 sign() { codesign --force --sign - --timestamp=none "$@"; }
-for fw in "$SAPP"/Frameworks/*.framework; do [ -d "$fw" ] && sign "$fw"; done
-for ex in "$SAPP"/PlugIns/*.appex; do [ -d "$ex" ] && sign "$ex"; done
+if [ -d "$SAPP/Frameworks" ]; then
+  for fw in "$SAPP"/Frameworks/*.framework; do [ -d "$fw" ] && sign "$fw"; done
+fi
+if [ -d "$SAPP/PlugIns" ]; then
+  for ex in "$SAPP"/PlugIns/*.appex; do [ -d "$ex" ] && sign "$ex"; done
+fi
 sign --entitlements "$ENT" "$SAPP"
 EMBEDDED=$(codesign -d --entitlements - "$SAPP" 2>&1 || true)
 for k in get-task-allow increased-memory-limit extended-virtual-addressing; do
