@@ -18,6 +18,7 @@ esac
 OUT="$HOME/Desktop/Henge.ipa"
 [ "$TROLLSTORE" = true ] && OUT="$HOME/Desktop/Henge.tipa"
 [ "$KEEP_DYNAMIC_CODESIGNING" = true ] && OUT="$HOME/Desktop/Henge-iOS16.tipa"
+[ -n "$HENGE_OUT" ] && OUT="$HENGE_OUT"
 [ -d "$IOS/deps/StikJIT.xcframework" ] || "$IOS/scripts/fetch_deps.sh"
 cd "$IOS"
 xcodegen generate >/dev/null
@@ -52,6 +53,10 @@ mkdir -p "$STAGE/Payload"
 cp -R "$APP" "$STAGE/Payload/"
 ENT="$STAGE/entitlements.plist"
 cp "$IOS/Henge/Henge.entitlements" "$ENT"
+# Diagnostics: drop restricted entitlements that a given install cannot hold.
+if [ -n "$ENT_STRIP" ]; then
+  for k in ${=ENT_STRIP}; do plutil -remove "$k" "$ENT" 2>/dev/null || true; done
+fi
 BANNED_KEYS=("com.apple.private.cs.debugger" "dynamic-codesigning" "com.apple.private.skip-library-validation")
 if [ "$TROLLSTORE" = true ]; then
   for k in "${BANNED_KEYS[@]}"; do
@@ -85,6 +90,7 @@ fi
 sign --entitlements "$ENT" "$SAPP"
 EMBEDDED=$(codesign -d --entitlements - "$SAPP" 2>&1 || true)
 for k in get-task-allow increased-memory-limit extended-virtual-addressing; do
+    if [ -n "$ENT_STRIP" ] && [[ "$ENT_STRIP" == *"$k"* ]]; then continue; fi
     grep -q "$k" <<< "$EMBEDDED" || { echo "==> $k did not embed; refusing to package" >&2; exit 1; }
 done
 ( cd "$STAGE" && zip -qry "$STAGE/package.tmp" Payload )

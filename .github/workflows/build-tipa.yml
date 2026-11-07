@@ -68,11 +68,24 @@ jobs:
           mkdir -p "$HOME/Desktop"
           ios/scripts/package_ipa.sh --trollstore-ios16
 
-      - name: Upload the tipa
+      # A second package with only get-task-allow + dynamic-codesigning. If the
+      # normal one is killed before main by a restricted entitlement, this one
+      # is the one that launches.
+      - name: Package the minimal-entitlement variant
+        env:
+          HUSK: ${{ runner.temp }}/Husk
+          IOS_DEPS: ${{ runner.temp }}/Husk/build/ios-arm64/sysroot
+          HENGE_OUT: /Users/runner/Desktop/Henge-iOS16-min.tipa
+          ENT_STRIP: "com.apple.developer.kernel.extended-virtual-addressing com.apple.developer.kernel.increased-memory-limit"
+        run: ios/scripts/package_ipa.sh --trollstore-ios16
+
+      - name: Upload the tipas
         uses: actions/upload-artifact@v4
         with:
-          name: Henge-iOS16-tipa
-          path: /Users/runner/Desktop/Henge-iOS16.tipa
+          name: Henge-iOS16-tipas
+          path: |
+            /Users/runner/Desktop/Henge-iOS16.tipa
+            /Users/runner/Desktop/Henge-iOS16-min.tipa
           if-no-files-found: error
 
       - name: Upload logs on failure

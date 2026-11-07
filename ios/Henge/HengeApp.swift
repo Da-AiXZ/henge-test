@@ -6,6 +6,12 @@ struct HengeApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        // A beacon written before anything else: if the app dies in dyld or in
+        // HengeLog.start, this is the only thing in Documents that says so.
+        if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            try? "launch \(Date())\n".write(to: docs.appendingPathComponent("launch.txt"),
+                                            atomically: true, encoding: .utf8)
+        }
         // Order matters: HengeLog takes over stderr, so the engine's and the JIT
         // allocator's first lines land in Documents/henge.log too.
         HengeLog.start()
