@@ -57,7 +57,7 @@ Then a Henge folder in the Mac's home folder is the same folder as Files › Hen
 - For the first few minutes after you log in, macOS is busy starting up in the background, so apps open more slowly.
 - Only one Mac can start per launch. Quit Henge and open it again to start another, and to start one again after restarting or shutting down macOS.
 - iPadOS keeps some keyboard shortcuts for itself, such as Command-Tab.
-- iOS 16 support is new and untested: it needs TrollStore or a jailbreak for JIT, and the built-in helper and StikDebug do not apply there.
+- iOS 16 support is new and untested: it needs TrollStore or a jailbreak for JIT. The iOS 16 package omits `dynamic-codesigning` (iPadOS 16.6.1 kills the app at launch with it) and uses TrollStore's enable-jit instead.
 - It's emulation, so it runs slower than a real Mac.
 
 ## Screenshots

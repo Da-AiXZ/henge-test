@@ -5,19 +5,20 @@
 # package_ipa.sh does: the sideloader (SideStore, AltStore, Impactor) re-signs it
 # with the user's own certificate and keeps the entitlements it can.
 # --trollstore strips the entitlements TrollStore bans under PPL/TXM.
-# --trollstore-ios16 is the same build for an iOS 16 device: there is no TXM
-# there, so TrollStore's JIT needs dynamic-codesigning and it is kept.
+# --trollstore-ios16 is the build for iOS 16: no built-in JIT helper or StikJIT,
+# and no dynamic-codesigning (on iPadOS 16.6.1 that entitlement makes the system
+# kill the app before main; JIT comes from get-task-allow + TrollStore enable-jit).
 set -e
 IOS="$(cd "$(dirname "$0")/.." && pwd)"
 TROLLSTORE=false
-KEEP_DYNAMIC_CODESIGNING=false
+IOS16_BUNDLE=false
 case "$1" in
   --trollstore) TROLLSTORE=true ;;
-  --trollstore-ios16) TROLLSTORE=true; KEEP_DYNAMIC_CODESIGNING=true ;;
+  --trollstore-ios16) TROLLSTORE=true; IOS16_BUNDLE=true ;;
 esac
 OUT="$HOME/Desktop/Henge.ipa"
 [ "$TROLLSTORE" = true ] && OUT="$HOME/Desktop/Henge.tipa"
-[ "$KEEP_DYNAMIC_CODESIGNING" = true ] && OUT="$HOME/Desktop/Henge-iOS16.tipa"
+[ "$IOS16_BUNDLE" = true ] && OUT="$HOME/Desktop/Henge-iOS16.tipa"
 [ -n "$HENGE_OUT" ] && OUT="$HENGE_OUT"
 [ -d "$IOS/deps/StikJIT.xcframework" ] || "$IOS/scripts/fetch_deps.sh"
 cd "$IOS"
@@ -37,7 +38,7 @@ rc=0
 REQUIRED=("$APP/Henge" "$APP/henge-jit.js")
 # The built-in JIT helper (iOS 26) and StikJIT (17.4) are unusable on iOS 16,
 # and their higher minimum OS can stop iOS 16 from launching the bundle.
-if [ "$KEEP_DYNAMIC_CODESIGNING" != true ]; then
+if [ "$IOS16_BUNDLE" != true ]; then
     REQUIRED+=("$APP/PlugIns/HengeJITHelper.appex/HengeJITHelper"
                "$APP/Frameworks/StikJIT.framework/StikJIT"
                "$APP/Frameworks/StikJIT.framework/Info.plist")
@@ -69,16 +70,22 @@ PY
 fi
 BANNED_KEYS=("com.apple.private.cs.debugger" "dynamic-codesigning" "com.apple.private.skip-library-validation")
 if [ "$TROLLSTORE" = true ]; then
-  for k in "${BANNED_KEYS[@]}"; do
-    if [ "$KEEP_DYNAMIC_CODESIGNING" = true ] && [ "$k" = "dynamic-codesigning" ]; then continue; fi
-    /usr/libexec/PlistBuddy -c "Delete :$k" "$ENT" >/dev/null 2>&1 || true
-  done
+  python3 - "$ENT" "${BANNED_KEYS[@]}" <<'PY'
+import plistlib, sys
+path, keys = sys.argv[1], sys.argv[2:]
+with open(path, "rb") as f:
+    data = plistlib.load(f)
+for key in keys:
+    data.pop(key, None)
+with open(path, "wb") as f:
+    plistlib.dump(data, f)
+PY
 fi
 SAPP="$STAGE/Payload/Henge.app"
 # iOS 16 has no use for the built-in JIT helper, and both it (26.0) and StikJIT
 # (17.4) declare a newer minimum OS than the app: leaving them in can make the
 # system refuse to launch the bundle at all.
-if [ "$KEEP_DYNAMIC_CODESIGNING" = true ]; then
+if [ "$IOS16_BUNDLE" = true ]; then
   rm -rf "$SAPP/PlugIns/HengeJITHelper.appex" "$SAPP/Frameworks/StikJIT.framework"
   rmdir "$SAPP/PlugIns" 2>/dev/null || true
   rmdir "$SAPP/Frameworks" 2>/dev/null || true

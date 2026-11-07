@@ -11,9 +11,11 @@ libslirp and glib for iOS).
   memory. Henge uses the same machinery as Husk: StikDebug, TrollStore, a
   jailbreak, or the built-in StikJIT helper (`HengeJITHelper.appex`, with
   on-device pairing on iOS 27). The app deploys to iOS 16; below iOS 26 there is
-  no TXM, so the JIT routes are TrollStore, TrollStore Lite or a jailbreak
-  (`dynamic-codesigning` or a debugged process), and neither StikDebug nor the
-  built-in helper applies. The app claims one 1 GB region per launch
+  no TXM, so the JIT routes are TrollStore, TrollStore Lite or a jailbreak. On
+  iPadOS 16.6.1 a `dynamic-codesigning` entitlement makes the system kill the app
+  before `main`, so the iOS 16 package omits it and uses `get-task-allow` plus
+  TrollStore's enable-jit instead; neither StikDebug nor the built-in helper
+  applies there. The app claims one 1 GB region per launch
   (`JITBootstrap.jitBytes`) and the engine writes through a `vm_remap`'d alias
   (`host/jit_region.c`, split mode).
 - **Memory**: `increased-memory-limit` is recommended, not required. Once a

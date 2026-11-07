@@ -57,28 +57,20 @@ jobs:
           make ios-lib
           ./tools/build_ios_restore.sh
 
-      # One tipa per entitlement combination. The bare build already launches
-      # on iPadOS 16.6.1, so this isolates which single entitlement iOS kills.
-      # --trollstore-ios16 keeps dynamic-codesigning unless ENT_STRIP removes it.
-      - name: Package entitlement variants
+      # dynamic-codesigning is what killed the app before main on iPadOS 16.6.1.
+      # The normal iOS 16 bundle keeps get-task-allow + the two memory
+      # entitlements, and gets JIT from TrollStore's enable-jit instead.
+      - name: Package the iOS 16 tipas
         env:
           HUSK: ${{ runner.temp }}/Husk
           IOS_DEPS: ${{ runner.temp }}/Husk/build/ios-arm64/sysroot
         run: |
           set -euo pipefail
           mkdir -p "$HOME/Desktop"
-          EVA="com.apple.developer.kernel.extended-virtual-addressing"
-          MEM="com.apple.developer.kernel.increased-memory-limit"
-          pkg() {
-            HENGE_OUT="$HOME/Desktop/$1" ENT_STRIP="$2" \
-              ios/scripts/package_ipa.sh --trollstore-ios16
-          }
-          pkg Henge-iOS16.tipa ""
-          pkg Henge-iOS16-bare.tipa "get-task-allow dynamic-codesigning $MEM $EVA"
-          pkg Henge-iOS16-gta.tipa "dynamic-codesigning $MEM $EVA"
-          pkg Henge-iOS16-dcs.tipa "get-task-allow $MEM $EVA"
-          pkg Henge-iOS16-mem.tipa "get-task-allow dynamic-codesigning $EVA"
-          pkg Henge-iOS16-eva.tipa "get-task-allow dynamic-codesigning $MEM"
+          ios/scripts/package_ipa.sh --trollstore-ios16
+          HENGE_OUT="$HOME/Desktop/Henge-iOS16-gta.tipa" \
+            ENT_STRIP="com.apple.developer.kernel.increased-memory-limit com.apple.developer.kernel.extended-virtual-addressing" \
+            ios/scripts/package_ipa.sh --trollstore-ios16
 
       - name: Upload the tipas
         uses: actions/upload-artifact@v4
